@@ -1,0 +1,5 @@
+#!/usr/bin/ruby -w
+
+value = "" # le string contenant le float a analyser
+
+puts value =~ //
