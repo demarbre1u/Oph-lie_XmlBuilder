@@ -1,0 +1,206 @@
+#!/usr/bin/ruby -w
+
+require 'gtk2'
+require 'rexml/document'
+
+include REXML
+
+#############################################################################################################################
+#
+# On crée la fenêtre
+#
+#############################################################################################################################
+
+window = Gtk::Window.new("XmlBuilder v0.3")
+window.set_default_size(720, 540)
+
+#############################################################################################################################
+#
+# On build le programme
+#
+#############################################################################################################################
+
+# On crée un label et une zone de saisie pour l'image
+label = Gtk::Label.new("Enter the image to load :")
+entry = Gtk::Entry.new
+entry.editable = false
+
+hbox = Gtk::HBox.new(false, 0)
+hbox.pack_start label, false, false, 2
+hbox.pack_start entry
+
+# On crée un selecteur de fichier
+btn_search = Gtk::Button.new("Browse...")
+btn_search.signal_connect("clicked") do
+  fs = Gtk::FileSelection.new("Chose an image")
+  fs.hide_fileop_buttons
+  fs.ok_button.signal_connect("clicked") do
+    # faire un test ici pour vérifier que le fichier est bien une image
+    entry.text = fs.filename
+    fs.close
+  end
+  fs.cancel_button.signal_connect("clicked") do
+    fs.close
+  end
+  fs.show
+end
+hbox.pack_start btn_search, false, false, 0
+
+# On crée la zone de saisie 
+text = Gtk::TextView.new
+scroll = Gtk::ScrolledWindow.new
+scroll.add text
+
+# On crée une barre de menu
+mb = Gtk::MenuBar.new
+
+filemenu = Gtk::Menu.new
+filem = Gtk::MenuItem.new "File"
+filem.set_submenu filemenu
+
+# On crée un menu 'New'
+newf = Gtk::MenuItem.new "New"
+newf.signal_connect("activate") do  
+  entry.text = ""
+  text.buffer = Gtk::TextBuffer.new
+end
+filemenu.append newf
+
+# On crée un menu 'Load'
+load = Gtk::MenuItem.new("Load XML")
+load.signal_connect("activate") do
+  fs = Gtk::FileSelection.new("Chose an image")
+  fs.ok_button.signal_connect("clicked") do
+    fs.filename[/.*(\.xml)$/]
+    if File.directory? fs.filename || $1 == "" 
+      dialog = Gtk::Dialog.new("Error loading file",
+          window,
+          Gtk::Dialog::DESTROY_WITH_PARENT,
+          [ Gtk::Stock::OK, Gtk::Dialog::RESPONSE_NONE ])
+      
+      dialog.vbox.add(Gtk::Label::new("Can't open directory or non-XML file!"))       
+      dialog.signal_connect("response") {dialog.destroy}
+      dialog.show_all
+    else
+      # On parse le fichier XML pour l'afficher dans le buffer de la zone de texte
+      doc = Document.new(File.new(fs.filename))
+      root = doc.root
+      entry.text = root.attributes['img']
+      text.buffer.text = ""
+        
+      root.each_element("//paragraphe") do |para| 
+        para.each_element("p") {|p| text.buffer.text += p.text + "\n"}
+        text.buffer.text += "§\n"
+      end
+    end
+    
+    fs.destroy
+  end
+  fs.cancel_button.signal_connect("clicked") {fs.destroy}
+  
+  fs.show_all 
+end
+filemenu.append load
+
+# On crée un menu 'Save'
+save = Gtk::MenuItem.new("Save")
+save.signal_connect("activate") do
+  fs = Gtk::FileSelection.new("Chose an image")
+  fs.ok_button.signal_connect("clicked") do
+
+    dir_to_save = ""
+
+    if (! File.directory? fs.filename)
+      fs.filename[/(.*\/).*$/]
+      dir_to_save = $1
+    else
+      dir_to_save = fs.filename + "/"
+    end
+
+    # Créer le fichier et on le remplit 
+    doctype = "<!DOCTYPE page>"
+    debut_page = '<page img="' + entry.text + '">'
+
+    # On parse les paragraphes sur '§'
+    para = text.buffer.text.split("§")
+
+    # On parse les phrases sur '\n'
+    corps = ""
+    para.each do |p|
+      sentences = p.split("\n")
+      corps += "<paragraphe>"
+      sentences.each do |s|
+        corps += "<p>" + s + "</p>" if s != ""
+      end
+      corps += "</paragraphe>"
+    end
+
+    # Il faudra parser les mots pour encapsuler ceux qui auront des effets JS/CSS
+    
+    fin_page = "</page>"
+
+    dialog = Gtk::Dialog.new("File naming",
+    window,
+    Gtk::Dialog::DESTROY_WITH_PARENT,
+    [ Gtk::Stock::OK, Gtk::Dialog::RESPONSE_ACCEPT ])
+
+    entry_name = Gtk::Entry.new    
+
+    dialog.vbox.add(Gtk::Label.new("Enter your file name :"))
+    dialog.vbox.add(entry_name)    
+    dialog.show_all
+    
+    dialog.run do |response|
+      case response
+      when Gtk::Dialog::RESPONSE_ACCEPT
+        chosen_name = entry_name.text
+        if chosen_name == ""
+          chosen_name = "default.xml" 
+        end
+        
+        if(! FileTest.exist? dir_to_save + chosen_name)
+          system("touch " + dir_to_save + chosen_name)
+        end
+        
+        File.open(dir_to_save + chosen_name, 'w') do |file| 
+          file.write(doctype)
+          file.write(debut_page)
+          file.write(corps)
+          file.write(fin_page)
+        end
+      end 
+      dialog.destroy
+    end
+    
+    fs.close
+  end
+  fs.cancel_button.signal_connect("clicked") do
+    fs.close
+  end
+  fs.show
+end
+filemenu.append save 
+
+# On crée un menu 'Exit'
+exit = Gtk::MenuItem.new "Exit"
+exit.signal_connect("activate") {Gtk.main_quit}
+filemenu.append exit
+
+mb.append filem
+
+# On agence la fenêtre
+vbox = Gtk::VBox.new false, 2
+vbox.pack_start mb, false, false, 0
+vbox.pack_start hbox, false, false, 0
+vbox.pack_start(scroll)
+
+#############################################################################################################################
+#
+# Fin du programme, on affiche la fenêtre
+#
+#############################################################################################################################
+
+window.signal_connect("destroy") {Gtk.main_quit}
+window.add(vbox)
+window.show_all
+Gtk.main
