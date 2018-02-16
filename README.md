@@ -7,4 +7,4 @@ Both project have been abandonned, but the program is working, though it doesn't
 ### How do I get set up? ###
 
 You might need to install some GTK2 related packages for this program to work.
-Aside from this and Ruby itself, nothing else should be required.
+Aside from these and Ruby itself, nothing else should be required.
