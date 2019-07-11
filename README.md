@@ -4,7 +4,7 @@ This repository contains a small Ruby program that can build an XML file from an
 
 It was originaly created to generate the XML files that would've been required for the "Ophélie" project.
 
-Both project have been abandonned, but the program is working, though it doesn't have all the functionnalities it should've had.
+Both project have been abandoned, but the program is working, though it doesn't have all the functionnalities it should've had.
 
 ### How do I get set up? ###
 
